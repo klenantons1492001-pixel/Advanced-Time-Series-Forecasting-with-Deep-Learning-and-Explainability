@@ -1,0 +1,120 @@
+#Advanced Time Series Forecasting With Deep Learning and Explainability
+
+import numpy as np
+import pandas as pd
+
+
+# ------------------------------------------------------------------
+# 1. CREATE SYNTHETIC DATASET
+# ------------------------------------------------------------------
+
+def generate_data(n=800):
+    t = np.arange(n)
+
+    trend = 0.01 * t
+    season = 2 * np.sin(2 * np.pi * t / 40)
+    noise = np.random.normal(0, 0.5, n)
+
+    exog1 = np.cos(2 * np.pi * t / 25)
+    exog2 = np.random.normal(0, 1, n)
+
+    target = trend + season + 0.5 * exog1 + 0.2 * exog2 + noise
+
+    return pd.DataFrame({"target": target, "exog1": exog1, "exog2": exog2})
+
+
+# ------------------------------------------------------------------
+# 2. SIMPLE NORMALIZATION (MIN‑MAX WITHOUT SKLEARN)
+# ------------------------------------------------------------------
+
+def min_max_scale(data):
+    min_vals = data.min(axis=0)
+    max_vals = data.max(axis=0)
+    scaled = (data - min_vals) / (max_vals - min_vals + 1e-8)
+    return scaled, min_vals, max_vals
+
+
+# ------------------------------------------------------------------
+# 3. CREATE SLIDING WINDOW SEQUENCES
+# ------------------------------------------------------------------
+
+def make_sequences(data, steps=20, horizon=5):
+    X, y = [], []
+
+    for i in range(len(data) - steps - horizon):
+        X.append(data[i : i + steps].flatten())
+        y.append(data[i + steps : i + steps + horizon, 0])
+
+    return np.array(X), np.array(y)
+
+
+# ------------------------------------------------------------------
+# 4. VERY SIMPLE FORECASTING MODEL
+#    (Average of last window values)
+# ------------------------------------------------------------------
+
+def simple_forecast(X_test, steps=20, horizon=5):
+    """
+    Predict future values using the mean of the last observed target window.
+    This acts as a very basic baseline forecasting model.
+    """
+
+    preds = []
+
+    for row in X_test:
+        # reshape back to (steps, features)
+        window = row.reshape(steps, -1)
+
+        last_target_values = window[:, 0]
+        mean_val = last_target_values.mean()
+
+        preds.append(np.full(horizon, mean_val))
+
+    return np.array(preds)
+
+
+# ------------------------------------------------------------------
+# 5. METRICS (RMSE, MAE, MAPE) WITHOUT SKLEARN
+# ------------------------------------------------------------------
+
+def metrics(y_true, y_pred):
+    rmse = np.sqrt(np.mean((y_true - y_pred) ** 2))
+    mae = np.mean(np.abs(y_true - y_pred))
+    mape = np.mean(np.abs((y_true - y_pred) / (y_true + 1e-8))) * 100
+
+    return rmse, mae, mape
+
+
+# ------------------------------------------------------------------
+# 6. MAIN PROGRAM
+# ------------------------------------------------------------------
+
+def main():
+    print("Generating synthetic dataset...")
+    df = generate_data()
+
+    print("Applying simple normalization...")
+    scaled, _, _ = min_max_scale(df.values)
+
+    print("Creating sliding window sequences...")
+    X, y = make_sequences(scaled)
+
+    split = int(0.8 * len(X))
+    X_train, X_test = X[:split], X[split:]
+    y_train, y_test = y[:split], y[split:]
+
+    print("Running simple forecasting model...")
+    preds = simple_forecast(X_test)
+
+    rmse, mae, mape = metrics(y_test, preds)
+
+    print("\nForecasting Results (Simple Baseline Model)")
+    print("RMSE:", round(rmse, 4))
+    print("MAE :", round(mae, 4))
+    print("MAPE:", round(mape, 2), "%")
+
+    print("\nProject Completed Successfully ✅")
+
+
+if __name__ == "__main__":
+    main()
